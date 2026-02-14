@@ -1,0 +1,8 @@
+flask
+langchain
+langchain-huggingface
+sentence-transformers
+chromadb
+boto3
+python-dotenv
+pypdf
