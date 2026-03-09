@@ -2,7 +2,7 @@ import os
 import boto3
 from app.config import Config
 
-class StorageService:
+class StorageService:   
     def __init__(self):
         # Create an S3 client using credentials from Config class
         self.s3 = boto3.client(

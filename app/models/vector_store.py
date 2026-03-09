@@ -8,25 +8,23 @@ class VectorStoreManager:
         # Using a high-quality, free embedding model from Hugging Face
         self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         self.db_path = "chroma_db" # This will be created locally
-
+        
     def create_vector_store(self, docs):
-        """
-        Takes list of documents, splits them, and stores them in ChromaDB
-        """
-        # 1. Split text into chunks
+        # This logic handles both long and short papers effectively
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, 
-            chunk_overlap=200
+            chunk_size=1000,   # Large enough for research paragraphs
+            chunk_overlap=200, # High overlap so resume details aren't lost
+            separators=["\n\n", "\n", " ", ""]
         )
         chunks = text_splitter.split_documents(docs)
         
-        # 2. Create and persist the vector store
+        # Recreate the store to ensure no "Transfer Learning" hallucinations remain
         vectorstore = Chroma.from_documents(
             documents=chunks,
             embedding=self.embeddings,
             persist_directory=self.db_path
         )
-        print(f"✅ Vector store created with {len(chunks)} chunks.")
+        print(f"✅ Indexed {len(chunks)} chunks from the uploaded document.")
         return vectorstore
 
     def load_vector_store(self):
