@@ -1,4 +1,4 @@
-import os
+import os, gc
 import shutil
 import tempfile
 from flask import Flask, render_template, request, jsonify
@@ -41,50 +41,40 @@ def upload_file():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
-    # 1. Clear existing objects to release file locks on 'chroma_db'
+    # 1. Clear references to release memory locks
     vectorstore = None
     llm_service = None
-    
-    # 2. Delete the old DB folder safely
-    if os.path.exists("chroma_db"):
-        try:
-            shutil.rmtree("chroma_db")
-            print("🧹 Old Knowledge Base cleared.")
-        except Exception as e:
-            print(f"Warning: Could not clear directory: {e}")
+    gc.collect() 
 
-    # 3. Create temp path manually (Windows-safe)
-    temp_dir = tempfile.gettempdir()
-    temp_path = os.path.join(temp_dir, file.filename)
+    temp_path = os.path.join(tempfile.gettempdir(), file.filename)
     
     try:
-        # Save and upload
         file.save(temp_path)
         storage_service.upload_file(temp_path, file.filename)
         
-        # Load and process PDF
         loader = PyPDFLoader(temp_path)
         docs = loader.load()
         
         if len(docs) == 0:
             return jsonify({"error": "No text found in PDF."}), 400
 
-        # 4. Re-initialize the Vector Store and LLM Service
+        # 2. Let the manager handle the wipe and re-initialization internally
+        # This is the safest way to avoid the 'default_tenant' conflict
         vectorstore = vector_manager.create_vector_store(docs)
         llm_service = LLMService(vectorstore)
         
         return jsonify({"message": "✅ Knowledge Base Updated!"})
     
     except Exception as e:
-        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
-        
+        # If the tenant error happens here, it's because the previous DB was corrupted
+        return jsonify({"error": f"Database Error: {str(e)}. Please restart the server and try again."}), 500
     finally:
-        # 5. Final cleanup of the temp file
         if os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except PermissionError:
-                print(f"Wait: Could not delete {temp_path} - file still in use.")
+            except:
+                pass
+
 
 @app.route('/chat', methods=['POST'])
 def chat():

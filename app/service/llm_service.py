@@ -43,13 +43,21 @@ class LLMService:
             input_variables=["context", "question"]
         )
 
-        # 5. Create the Chain with the custom prompt
+        # 5. Create the Chain with MMR (Maximum Marginal Relevance)
         self.qa_chain = ConversationalRetrievalChain.from_llm(
-        llm=self.chat_model,
-        retriever=vectorstore.as_retriever(search_kwargs={"k": 5}), # Increased k
-        memory=self.memory,
-        combine_docs_chain_kwargs={"prompt": QA_PROMPT}
-    )
+            llm=self.chat_model,
+            retriever=vectorstore.as_retriever(
+                search_type="mmr", # Prevents getting stuck in 'References'
+                search_kwargs={
+                    "k": 5, 
+                    "fetch_k": 20, # Fetches 20 chunks, then picks the 5 most diverse
+                    "lambda_mult": 0.5 
+                }
+            ),
+            memory=self.memory,
+            combine_docs_chain_kwargs={"prompt": QA_PROMPT}
+        )
+    
 
     def get_response(self, question):
         try:
