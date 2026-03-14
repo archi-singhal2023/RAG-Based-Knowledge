@@ -1,9 +1,6 @@
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
-from langchain_classic.chains import ConversationalRetrievalChain
-from langchain_classic.memory import ConversationBufferMemory
 from langchain_core.prompts import PromptTemplate 
 from app.config import Config
-
 
 class LLMService:
     def __init__(self, vectorstore):
@@ -11,66 +8,34 @@ class LLMService:
         llm = HuggingFaceEndpoint(
             repo_id="mistralai/Mistral-7B-Instruct-v0.2",
             huggingfacehub_api_token=Config.HUGGINGFACEHUB_API_TOKEN,
-            temperature=0.1, # Lowered temperature for higher accuracy
+            temperature=0.1, 
             max_new_tokens=512
         )
 
         # 2. Wrap it in ChatHuggingFace
         self.chat_model = ChatHuggingFace(llm=llm)
+        self.vectorstore = vectorstore
 
-        # 3. Setup Memory
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True
-        )
-
-        # 4. Define a Strict Prompt Template
+        #3. Strict instructions to ignore citations
         # This forces the AI to only use the text found in Archi's resume or the paper
-        template = """You are a professional assistant for a Knowledge Management System. 
-        Use the following pieces of retrieved context to answer the question. 
-        If the answer is not in the context, say that you don't know. 
-        Do not use outside knowledge.
-        CRITICAL: Ignore the 'References' or 'Bibliography' sections if they conflict with the main text.
-
+        self.template = """You are a professional assistant for a Knowledge Management System. Answer based ONLY on the context.
+        
+        STRICT EVALUATION RULES:
+        1. Primary Identity: The TITLE and AUTHORS of this paper are always on the first page.
+        2. Citation Filter: Do NOT cite papers from the 'References' section as the current paper.
+        3. Accuracy: If the answer is not in the context, say you don't know.
         Context: {context}
-
         Question: {question}
-        
-        Helpful Answer:"""
-        
-        QA_PROMPT = PromptTemplate(
-            template=template, 
-            input_variables=["context", "question"]
-        )
-
-        # 5. Create the Chain with MMR (Maximum Marginal Relevance)
-        self.qa_chain = ConversationalRetrievalChain.from_llm(
-            llm=self.chat_model,
-            retriever=vectorstore.as_retriever(
-                search_type="mmr", # Prevents getting stuck in 'References'
-                search_kwargs={
-                    "k": 5, 
-                    "fetch_k": 20, # Fetches 20 chunks, then picks the 5 most diverse
-                    "lambda_mult": 0.5 
-                }
-            ),
-            memory=self.memory,
-            combine_docs_chain_kwargs={"prompt": QA_PROMPT}
-        )
-    
+        Answer:"""
+        self.prompt = PromptTemplate(template=self.template, input_variables=["context", "question"])
 
     def get_response(self, question):
-        try:
-            # Debugging step to see what Archi's resume/paper chunks look like
-            docs = self.qa_chain.retriever.invoke(question)
-            
-            print(f"\n--- DEBUG: CONTEXT RETRIEVED ---")
-            for i, d in enumerate(docs):
-                print(f"Chunk {i+1}: {d.page_content[:200]}...")
-            print(f"---------------------------------\n")
-            
-            response = self.qa_chain.invoke({"question": question})
-            return response['answer']
-            
-        except Exception as e:
-            return f"❌ Error generating response: {str(e)}"
+        # Level 2 Intent Check: Identify if user is asking for metadata
+        id_query = any(k in question.lower() for k in ["title", "author", "name of paper"])
+        
+        # k=10 for identity to capture the whole title page; k=5 for general content
+        search_k = 10 if id_query else 5
+        docs = self.vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": search_k}).invoke(question)
+        
+        context = "\n\n".join([d.page_content for d in docs])
+        return self.chat_model.invoke(self.prompt.format(context=context, question=question)).content

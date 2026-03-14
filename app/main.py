@@ -50,30 +50,16 @@ def upload_file():
     
     try:
         file.save(temp_path)
-        storage_service.upload_file(temp_path, file.filename)
-        
         loader = PyPDFLoader(temp_path)
         docs = loader.load()
         
-        if len(docs) == 0:
-            return jsonify({"error": "No text found in PDF."}), 400
-
-        # 2. Let the manager handle the wipe and re-initialization internally
-        # This is the safest way to avoid the 'default_tenant' conflict
+        # Create new vector store in a brand new unique folder
         vectorstore = vector_manager.create_vector_store(docs)
         llm_service = LLMService(vectorstore)
         
-        return jsonify({"message": "✅ Knowledge Base Updated!"})
-    
+        return jsonify({"message": "✅ Session Initialized: Ready for Analysis"})
     except Exception as e:
-        # If the tenant error happens here, it's because the previous DB was corrupted
-        return jsonify({"error": f"Database Error: {str(e)}. Please restart the server and try again."}), 500
-    finally:
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except:
-                pass
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/chat', methods=['POST'])
