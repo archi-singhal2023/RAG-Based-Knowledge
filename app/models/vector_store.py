@@ -24,7 +24,7 @@ class VectorStoreManager:
 
     def __init__(self):
         self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        self.db_root = "chroma_db_sessions"
+        self.db_root = os.getenv("CHROMA_DB_PATH", "chroma_db_sessions")
         self.client = None
         self.session_path = None
         os.makedirs(self.db_root, exist_ok=True)

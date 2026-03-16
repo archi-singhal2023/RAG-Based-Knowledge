@@ -1,9 +1,13 @@
-flask==3.0.0
+flask
 langchain
 langchain-community
 langchain-huggingface
-sentence-transformers
+langchain-chroma
+langchain-text-splitters
 chromadb
-boto3
-python-dotenv
+sentence-transformers
+huggingface-hub
 pypdf
+python-dotenv
+boto3
+gunicorn

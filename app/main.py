@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, jsonify
 from app.config import Config
 from app.service.llm_service import LLMService
 from app.models.vector_store import VectorStoreManager
+from app.service.storage_service import StorageService
 from langchain_community.document_loaders import PyPDFLoader
 
 # Configure server-side logging (errors logged here, not exposed to client)
@@ -30,7 +31,41 @@ vector_manager = VectorStoreManager()
 # FIX #9: llm_service is reused across uploads; only its vectorstore is swapped.
 llm_service: LLMService | None = None
 
+def _upload_to_s3_background(temp_path: str, filename: str):
+    """
+    Silently uploads the PDF to S3 in a background thread.
+    If AWS credentials are not configured, it logs and skips gracefully.
+    The user never waits for this — it runs after the response is returned.
+    """
+    try:
+        # Only attempt if AWS is fully configured
+        if not all([Config.AWS_ACCESS_KEY_ID, Config.AWS_SECRET_ACCESS_KEY,
+                    Config.BUCKET_NAME]):
+            logger.info("S3 not configured — skipping cloud backup.")
+            return
 
+        storage = StorageService()
+
+        # Save temp content to a new temp file since original may be deleted
+        # by the time this thread runs
+        import tempfile, shutil
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            backup_path = tmp.name
+
+        shutil.copy2(temp_path, backup_path) if os.path.exists(temp_path) else None
+
+        if os.path.exists(backup_path):
+            success = storage.upload_pdf(backup_path, object_name=filename)
+            if success:
+                logger.info(f"S3 backup complete: '{filename}'")
+            try:
+                os.remove(backup_path)
+            except:
+                pass
+
+    except Exception as e:
+        # Never crash the app over a backup failure
+        logger.warning(f"S3 background upload failed (non-critical): {e}")
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -88,7 +123,15 @@ def upload_file():
                 llm_service = LLMService(new_vectorstore, page1_text)
             else:
                 llm_service.update_vectorstore(new_vectorstore, page1_text)
-
+        
+        # S3 background upload — runs after lock is released so it never
+        # blocks the response. Fails silently if AWS is not configured.
+        threading.Thread(
+            target=_upload_to_s3_background,
+            args=(temp_path, file.filename),
+            daemon=True
+        ).start()
+        
         logger.info(f"Document '{file.filename}' uploaded and indexed successfully.")
         return jsonify({"message": "✅ Document Contextualized Successfully. You can now ask questions!"})
 
