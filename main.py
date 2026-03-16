@@ -17,7 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=os.path.join('app', 'templates'))
 
 # ─── Application State ────────────────────────────────────────────────────────
 # FIX #3 (thread safety): A lock ensures that concurrent /upload requests
