@@ -19,11 +19,15 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+ENV SENTENCE_TRANSFORMERS_HOME=/app/models
 # ── Stage 5: Download embedding model at build time ───────────────────────────
 # all-MiniLM-L6-v2 is ~90MB. Downloading during build means:
 # - First request is not slow (model already on disk)
 # - Works offline inside the container
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
+
+
 
 # ── Stage 6: Copy application code ────────────────────────────────────────────
 COPY . .
@@ -43,4 +47,4 @@ EXPOSE 8080
 # ── Stage 9: Start command ────────────────────────────────────────────────────
 # --workers 1: important — global state means multiple workers cause bugs
 # --timeout 120: PDF processing + LLM calls can take >30s
-CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:8080", "--workers", "1", "--timeout", "120"]
+CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:8080", "--workers", "1", "--timeout", "300", "--graceful-timeout", "300"]

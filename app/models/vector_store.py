@@ -23,15 +23,24 @@ class VectorStoreManager:
     """
 
     def __init__(self):
-        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        self._embeddings = None          # don't load yet
         self.db_root = os.getenv("CHROMA_DB_PATH", "chroma_db_sessions")
         self.client = None
         self.session_path = None
         os.makedirs(self.db_root, exist_ok=True)
-
-        # On startup, clean up any orphaned session folders from previous runs
         self._cleanup_orphaned_sessions()
 
+    @property
+    def embeddings(self):
+        if self._embeddings is None:
+            print("📦 Loading embedding model...")
+            self._embeddings = HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L6-v2",
+                cache_folder="/app/models"   # use the baked-in model
+            )
+            print("✅ Embedding model loaded.")
+        return self._embeddings
+    
     def create_vector_store(self, docs) -> Chroma:
         """
         Creates a new isolated session. Releases the previous client lock
