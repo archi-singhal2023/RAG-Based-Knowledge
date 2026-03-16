@@ -46,5 +46,5 @@ EXPOSE 8080
 
 # ── Stage 9: Start command ────────────────────────────────────────────────────
 # --workers 1: important — global state means multiple workers cause bugs
-# --timeout 120: PDF processing + LLM calls can take >30s
+# --timeout 120: PDF processing + LLM calls can take >30s, so increase timeout to prevent premature worker kills
 CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:8080", "--workers", "1", "--timeout", "300", "--graceful-timeout", "300"]

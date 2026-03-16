@@ -35,7 +35,7 @@ class VectorStoreManager:
         if self._embeddings is None:
             print("📦 Loading embedding model...")
             self._embeddings = HuggingFaceEmbeddings(
-                model_name="all-MiniLM-L6-v2",
+                model_name="paraphrase-MiniLM-L3-v2",
                 cache_folder="/app/models"   # use the baked-in model
             )
             print("✅ Embedding model loaded.")
