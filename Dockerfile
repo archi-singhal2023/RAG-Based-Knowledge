@@ -42,9 +42,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # ── Stage 8: Port ─────────────────────────────────────────────────────────────
-EXPOSE 8080
+EXPOSE 7860
 
 # ── Stage 9: Start command ────────────────────────────────────────────────────
 # --workers 1: important — global state means multiple workers cause bugs
 # --timeout 120: PDF processing + LLM calls can take >30s, so increase timeout to prevent premature worker kills
-CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:8080", "--workers", "1", "--timeout", "300", "--graceful-timeout", "300"]
+CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:7860", "--workers", "1", "--timeout", "300", "--graceful-timeout", "300"]
