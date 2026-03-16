@@ -20,13 +20,15 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models
+ENV HF_HOME=/app/models
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_DATASETS_OFFLINE=1
+
 # ── Stage 5: Download embedding model at build time ───────────────────────────
 # all-MiniLM-L6-v2 is ~90MB. Downloading during build means:
 # - First request is not slow (model already on disk)
 # - Works offline inside the container
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
-
-
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-MiniLM-L3-v2')"
 
 
 # ── Stage 6: Copy application code ────────────────────────────────────────────
