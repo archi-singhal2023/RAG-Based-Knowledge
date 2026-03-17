@@ -25,11 +25,12 @@ class LLMService:
         if LLMService._llm is None:
             print("🤖 Level 2: Initializing LLM (first time only)...")
             LLMService._llm = HuggingFaceEndpoint(
-                repo_id="mistralai/Mistral-7B-Instruct-v0.2",
-                huggingfacehub_api_token=Config.HUGGINGFACEHUB_API_TOKEN,
-                temperature=0.1,
-                max_new_tokens=512
-            )
+            repo_id="mistralai/Mistral-7B-Instruct-v0.2",
+            huggingfacehub_api_token=Config.HUGGINGFACEHUB_API_TOKEN,
+            temperature=0.1,
+            max_new_tokens=512,
+            endpoint_url="https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.2/v1/chat/completions"
+        )
             print("✅ Level 2: LLM ready.")
 
         self.chat_model = LLMService._llm
