@@ -2,38 +2,21 @@ services:
   - type: web
     name: documind
     runtime: docker
-
-    # Render builds your Dockerfile automatically
-    # No buildCommand or startCommand needed — Dockerfile handles it
-
-    # Persistent disk for ChromaDB sessions
-    # Without this, all vector stores are wiped on every redeploy
     disk:
       name: chroma-sessions
       mountPath: /data/chroma_db_sessions
       sizeGB: 1
-
-    # Health check — Render pings this to know your app is alive
     healthCheckPath: /
-
     envVars:
-      # ChromaDB will store sessions here on Render's persistent disk
       - key: CHROMA_DB_PATH
         value: /data/chroma_db_sessions
-
-      # sync: false means Render will NOT auto-sync these —
-      # you manually enter them in Render dashboard (keeps secrets safe)
       - key: HUGGINGFACEHUB_API_TOKEN
         sync: false
-
       - key: AWS_ACCESS_KEY_ID
         sync: false
-
       - key: AWS_SECRET_ACCESS_KEY
         sync: false
-
       - key: AWS_REGION
         sync: false
-
       - key: BUCKET_NAME
         sync: false

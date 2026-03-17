@@ -15,16 +15,11 @@ class VectorStoreManager:
     """
     Level 1 — Storage Layer.
     Responsible for all vector store lifecycle: creating, persisting, destroying.
-
-    Windows SQLite lock strategy:
-    Rather than fighting the lock immediately after closing ChromaDB,
-    we defer deletion of the old session folder to a background thread
-    that retries with generous backoff. The app never blocks on cleanup.
     """
 
     def __init__(self):
-        self._embeddings = None          # don't load yet
-        self.db_root = os.getenv("CHROMA_DB_PATH", "chroma_db_sessions")
+        self._embeddings = None
+        self.db_root = os.getenv("CHROMA_DB_PATH", "/data/chroma_db_sessions")
         self.client = None
         self.session_path = None
         os.makedirs(self.db_root, exist_ok=True)
@@ -34,23 +29,20 @@ class VectorStoreManager:
     def embeddings(self):
         if self._embeddings is None:
             print("📦 Loading embedding model...")
+            # Use /app/models if it exists (inside Docker)
+            # Otherwise let sentence-transformers use its default cache
+            cache_folder = "/app/models" if os.path.exists("/app/models") else None
             self._embeddings = HuggingFaceEmbeddings(
                 model_name="paraphrase-MiniLM-L3-v2",
-                cache_folder="/app/models"   # use the baked-in model
+                cache_folder=cache_folder
             )
             print("✅ Embedding model loaded.")
         return self._embeddings
-    
+
     def create_vector_store(self, docs) -> Chroma:
-        """
-        Creates a new isolated session. Releases the previous client lock
-        synchronously, then delegates folder deletion to a background thread
-        so the upload response is never blocked by Windows I/O.
-        """
-        old_path = self._release_client()  # Synchronous lock release only
+        old_path = self._release_client()
 
         if old_path:
-            # Kick off folder deletion in background — no blocking, no warnings
             t = threading.Thread(
                 target=self._delete_folder_with_retry,
                 args=(old_path,),
@@ -82,11 +74,6 @@ class VectorStoreManager:
         return vectorstore
 
     def _release_client(self) -> str | None:
-        """
-        Synchronously stops the ChromaDB client and clears its internal cache.
-        Returns the old session path so the caller can schedule deletion.
-        Does NOT delete the folder — that's done separately by background thread.
-        """
         chromadb.api.client.SharedSystemClient.clear_system_cache()
 
         old_path = None
@@ -105,43 +92,27 @@ class VectorStoreManager:
         return old_path
 
     def _delete_folder_with_retry(self, path: str):
-        """
-        Background thread target. Retries folder deletion with exponential
-        backoff for up to ~30 seconds total. SQLite releases its lock within
-        1-3 seconds on Windows after the client is stopped — this comfortably
-        covers that window without blocking anything.
-        """
-        # Initial wait: give Windows time to release the SQLite lock
         time.sleep(2)
-
         max_retries = 8
         for attempt in range(1, max_retries + 1):
             if not os.path.exists(path):
-                return  # Already gone — nothing to do
-
+                return
             try:
                 shutil.rmtree(path)
                 print(f"🗑️  Level 1: Deleted session folder '{os.path.basename(path)}' "
                       f"(attempt {attempt}).")
-                return  # Success
+                return
             except PermissionError:
                 if attempt == max_retries:
-                    print(f"⚠️  Level 1: Could not delete '{path}' after {max_retries} "
-                          f"attempts. It will be cleaned up on next app start.")
+                    print(f"⚠️  Could not delete '{path}' after {max_retries} attempts.")
                 else:
-                    wait = min(2 ** attempt, 10)  # 2s, 4s, 8s, 10s, 10s...
-                    print(f"⏳ Folder locked, retry {attempt}/{max_retries} in {wait}s...")
+                    wait = min(2 ** attempt, 10)
                     time.sleep(wait)
             except Exception as e:
                 print(f"⚠️  Unexpected folder delete error: {e}")
                 return
 
     def _cleanup_orphaned_sessions(self):
-        """
-        Called once on startup. Deletes any leftover session folders from
-        previous runs where the app was killed before cleanup could finish.
-        These folders have no active lock so deletion always succeeds.
-        """
         if not os.path.exists(self.db_root):
             return
         for name in os.listdir(self.db_root):
@@ -149,12 +120,11 @@ class VectorStoreManager:
                 orphan = os.path.join(self.db_root, name)
                 try:
                     shutil.rmtree(orphan)
-                    print(f"🧹 Level 1: Cleaned up orphaned session '{name}' from previous run.")
+                    print(f"🧹 Level 1: Cleaned up orphaned session '{name}'.")
                 except Exception as e:
                     print(f"⚠️  Could not clean orphan '{name}': {e}")
 
     def delete_db(self):
-        """Public method called by main.py on /new_chat."""
         old_path = self._release_client()
         if old_path:
             t = threading.Thread(
@@ -163,4 +133,4 @@ class VectorStoreManager:
                 daemon=True
             )
             t.start()
-        print("🏁 Level 1: Session cleared. Folder deletion running in background.")
+        print("🏁 Level 1: Session cleared.")
