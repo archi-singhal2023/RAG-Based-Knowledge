@@ -6,8 +6,10 @@ langchain-huggingface
 langchain-chroma
 langchain-text-splitters
 chromadb
-sentence-transformers
-huggingface-hub
+sentence-transformers==2.7.0
+transformers==4.40.0
+huggingface-hub==0.23.0
 pypdf
 python-dotenv
 boto3
+accelerate==0.29.0
