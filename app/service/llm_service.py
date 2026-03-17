@@ -111,7 +111,7 @@ STRICT RULES — follow without exception:
                 question=question
             )
 
-            answer = self.chat_model.invoke(full_prompt).content
+            answer = self.chat_model.invoke(full_prompt)
 
             self.chat_history.append({"human": question, "ai": answer})
             if len(self.chat_history) > self.max_history:
