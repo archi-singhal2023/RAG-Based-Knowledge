@@ -1,6 +1,7 @@
 from langchain_huggingface import HuggingFaceEndpoint
 from langchain_core.prompts import PromptTemplate
 from app.config import Config
+from langchain_openai import ChatOpenAI
 
 
 class LLMService:
@@ -24,11 +25,12 @@ class LLMService:
 
         if LLMService._llm is None:
             print("🤖 Level 2: Initializing LLM (first time only)...")
-            LLMService._llm = HuggingFaceEndpoint(
-            endpoint_url="https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.2/v1/chat/completions",
-            huggingfacehub_api_token=Config.HUGGINGFACEHUB_API_TOKEN,
+            LLMService._llm = ChatOpenAI(
+            model="mistralai/Mistral-7B-Instruct-v0.2",
+            openai_api_base="https://router.huggingface.co/featherless-ai/v1",
+            openai_api_key=Config.HUGGINGFACEHUB_API_TOKEN,
             temperature=0.1,
-            max_new_tokens=512
+            max_tokens=512
         )
             print("✅ Level 2: LLM ready.")
 
@@ -111,7 +113,7 @@ STRICT RULES — follow without exception:
                 question=question
             )
 
-            answer = self.chat_model.invoke(full_prompt)
+            answer = self.chat_model.invoke(full_prompt).content
 
             self.chat_history.append({"human": question, "ai": answer})
             if len(self.chat_history) > self.max_history:
