@@ -22,10 +22,6 @@ ENV TRANSFORMERS_CACHE=/app/models
 # Download and cache model at build time
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-MiniLM-L3-v2')"
 
-# After model is cached, set offline mode
-# This prevents any HuggingFace network calls at runtime
-ENV TRANSFORMERS_OFFLINE=1
-ENV HF_DATASETS_OFFLINE=1
 
 COPY . .
 

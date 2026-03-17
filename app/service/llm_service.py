@@ -1,4 +1,4 @@
-from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
+from langchain_huggingface import HuggingFaceEndpoint
 from langchain_core.prompts import PromptTemplate
 from app.config import Config
 
@@ -30,10 +30,9 @@ class LLMService:
                 temperature=0.1,
                 max_new_tokens=512
             )
-            LLMService._chat_model = ChatHuggingFace(llm=LLMService._llm)
             print("✅ Level 2: LLM ready.")
 
-        self.chat_model = LLMService._chat_model
+        self.chat_model = LLMService._llm
 
         # Plain list-based memory — no LangChain memory class needed.
         self.chat_history: list[dict] = []
