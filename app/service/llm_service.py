@@ -27,8 +27,8 @@ class LLMService:
             print("🤖 Level 2: Initializing LLM (first time only)...")
             LLMService._llm = ChatOpenAI(
             model="mistralai/Mistral-7B-Instruct-v0.2",
-            openai_api_base="https://router.huggingface.co/featherless-ai/v1",
-            openai_api_key=Config.HUGGINGFACEHUB_API_TOKEN,
+            base_url="https://router.huggingface.co/featherless-ai/v1",
+            api_key=Config.HUGGINGFACEHUB_API_TOKEN,
             temperature=0.1,
             max_tokens=512
         )
