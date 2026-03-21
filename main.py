@@ -77,9 +77,6 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    global llm_service
-
-    # FIX #7: Server-side file presence and type validation
     if 'file' not in request.files:
         return jsonify({"error": "No file was attached to the request."}), 400
 
@@ -91,64 +88,93 @@ def upload_file():
     if not file.filename.lower().endswith('.pdf'):
         return jsonify({"error": "Only PDF files are supported. Please upload a .pdf file."}), 400
 
-    # FIX #4: Use NamedTemporaryFile to get a guaranteed unique temp path,
-    # eliminating collisions from two uploads with the same filename.
-    tmp_file = None
+    try:
+        # Save file immediately — before any heavy processing
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        temp_path = tmp_file.name
+        tmp_file.close()
+        file.save(temp_path)
+
+        original_filename = file.filename
+
+        # Generate unique job ID and return immediately
+        job_id = str(uuid.uuid4())[:8]
+        _upload_jobs[job_id] = {"status": "processing", "message": "Processing document..."}
+
+        # All heavy processing runs in background thread
+        threading.Thread(
+            target=_process_upload_background,
+            args=(temp_path, original_filename, job_id),
+            daemon=True
+        ).start()
+
+        # Return immediately — Render proxy timeout avoided
+        return jsonify({"job_id": job_id, "message": "Upload received, processing..."}), 202
+
+    except Exception as e:
+        logger.error(f"Upload error: {e}", exc_info=True)
+        return jsonify({"error": "An internal error occurred. Please try again."}), 500
+
+
+def _process_upload_background(temp_path, filename, job_id):
+    """Background thread: heavy processing after upload response is sent."""
+    global llm_service
     try:
         with _state_lock:
-            # Create a unique temp file
-            tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-            temp_path = tmp_file.name
-            tmp_file.close()  # Close before saving so Windows can write to it
-
-            file.save(temp_path)
-
             loader = PyPDFLoader(temp_path)
             docs = loader.load()
 
             if not docs:
-                return jsonify({"error": "Could not extract text from this PDF. It may be scanned or image-based."}), 400
+                _upload_jobs[job_id] = {
+                    "status": "error",
+                    "message": "Could not extract text from this PDF. It may be scanned or image-based."
+                }
+                return
 
-            # FIX (page-1 pinning): Extract Page 1 text directly from the loader.
-            # PyPDFLoader produces one Document per page, so docs[0] is always
-            # Page 1. We take pages 0-1 in case a long title spills onto Page 2.
-            # This raw text is passed directly into LLMService, bypassing any
-            # metadata filter that Chroma may or may not support.
             page1_text = "\n\n".join([d.page_content for d in docs[:2]])
-
-            # Level 1: Create new vector store (handles cleanup of previous session)
             new_vectorstore = vector_manager.create_vector_store(docs)
 
-            # Level 2: Reuse LLMService if it exists, just swap the vectorstore.
-            # Create it fresh only on the very first upload.
             if llm_service is None:
                 llm_service = LLMService(new_vectorstore, page1_text)
             else:
                 llm_service.update_vectorstore(new_vectorstore, page1_text)
-        
-        # S3 background upload — runs after lock is released so it never
-        # blocks the response. Fails silently if AWS is not configured.
+
+        # S3 background upload
         threading.Thread(
             target=_upload_to_s3_background,
-            args=(temp_path, file.filename),
+            args=(temp_path, filename),
             daemon=True
         ).start()
-        
-        logger.info(f"Document '{file.filename}' uploaded and indexed successfully.")
-        return jsonify({"message": "✅ Document Contextualized Successfully. You can now ask questions!"})
+
+        _upload_jobs[job_id] = {
+            "status": "done",
+            "message": "✅ Document Contextualized Successfully. You can now ask questions!"
+        }
+        logger.info(f"Document '{filename}' processed successfully.")
 
     except Exception as e:
-        # FIX #14: Log the full error server-side; return a safe generic message to client.
-        logger.error(f"Upload error for file '{file.filename}': {e}", exc_info=True)
-        return jsonify({"error": "An internal error occurred while processing your document. Please try again."}), 500
-
+        logger.error(f"Background upload error for '{filename}': {e}", exc_info=True)
+        _upload_jobs[job_id] = {
+            "status": "error",
+            "message": "An internal error occurred while processing your document. Please try again."
+        }
     finally:
-        # Always clean up the temp file regardless of success or failure
-        if tmp_file and os.path.exists(tmp_file.name):
+        if os.path.exists(temp_path):
             try:
-                os.remove(tmp_file.name)
+                os.remove(temp_path)
             except Exception as e:
-                logger.warning(f"Could not delete temp file '{tmp_file.name}': {e}")
+                logger.warning(f"Could not delete temp file '{temp_path}': {e}")
+
+
+@app.route('/upload_status/<job_id>', methods=['GET'])
+def upload_status(job_id):
+    """Frontend polls this to check background processing status."""
+    job = _upload_jobs.get(job_id)
+    if not job:
+        return jsonify({"status": "error", "message": "Job not found."}), 404
+    if job["status"] in ("done", "error"):
+        _upload_jobs.pop(job_id, None)
+    return jsonify(job)
 
 
 @app.route('/chat', methods=['POST'])
