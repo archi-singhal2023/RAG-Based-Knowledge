@@ -164,8 +164,8 @@ def chat():
         return jsonify({"answer": "I didn't receive a question. Please type something and try again."})
 
     # Level 2: Delegate fully to the intelligence layer
-    answer = llm_service.get_response(user_query)
-    return jsonify({"answer": answer})
+    answer, context, page1 = llm_service.get_response(user_query)
+    return jsonify({"answer": answer, "context": context, "page1": page1})
 
 
 @app.route('/new_chat', methods=['POST'])

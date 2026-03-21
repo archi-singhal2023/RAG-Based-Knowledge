@@ -125,7 +125,7 @@ class LLMService:
             if len(self.chat_history) > self.max_history:
                 self.chat_history.pop(0)
 
-            return answer
+            return answer, retrieved_context, self.page1_text
 
         except Exception as e:
             print(f"❌ Level 2 LLM Error: {e}")

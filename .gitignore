@@ -5,3 +5,25 @@ __pycache__/
 chroma_db*/
 chroma_db_sessions/
 data/
+
+#Research work
+eval_pdfs/
+DocuMind/
+
+compare_graph.py
+score.py
+evaluate.py
+
+eval_results_baseline_scored.xlsx
+eval_results_baseline.xlsx
+eval_results_scored.xlsx
+eval_results.xlsx
+graph_accuracy_baseline_by_type.png
+graph_accuracy_by_type.png
+graph_baseline_overall.png
+graph_baseline_per_question.png
+graph_comparison_grouped.png
+graph_comparison_table.png
+graph_identity_improvement.png
+graph_overall.png
+graph_per_question.png
