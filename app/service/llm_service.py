@@ -126,7 +126,6 @@ class LLMService:
                 self.chat_history.pop(0)
 
             return answer, retrieved_context, self.page1_text
-
         except Exception as e:
             print(f"❌ Level 2 LLM Error: {e}")
-            return "Sorry, I encountered an error while processing your question. Please try again."
+            return "Sorry, I encountered an error while processing your question. Please try again.", "", ""
