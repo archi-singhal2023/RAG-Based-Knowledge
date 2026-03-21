@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Set cache paths BEFORE downloading model
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models
-ENV HF_HOME=/app/models
+ENV HF_HOME=/app/.cache/huggingface
 ENV TRANSFORMERS_CACHE=/app/models
 
 # Download and cache model at build time
