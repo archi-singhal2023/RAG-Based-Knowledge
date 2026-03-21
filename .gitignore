@@ -8,8 +8,7 @@ data/
 
 #Research work
 eval_pdfs/
-DocuMind/
-DocuMind*/
+
 
 compare_graph.py
 score.py
