@@ -294,7 +294,6 @@
       }
 
       // ── Upload ───────────────────────────────────────────────────────────────
-
       async function uploadFile() {
         const fileInput = document.getElementById("fileInput");
         const btn = document.getElementById("uploadBtn");
@@ -302,7 +301,6 @@
 
         const file = fileInput.files[0];
 
-        // FIX #7: Client-side validation (server also validates as a second layer)
         if (!file) {
           status.innerHTML = `<span class="text-warning">⚠️ Please select a PDF file first.</span>`;
           return;
@@ -314,7 +312,7 @@
         }
 
         btn.disabled = true;
-        status.innerHTML = `<span class="text-info"><span class="spinner-border spinner-border-sm me-1"></span> Processing...</span>`;
+        status.innerHTML = `<span class="text-info"><span class="spinner-border spinner-border-sm me-1"></span> Uploading...</span>`;
 
         const formData = new FormData();
         formData.append("file", file);
@@ -326,21 +324,49 @@
           });
           const result = await response.json();
 
-          if (response.ok && result.message) {
-            status.innerHTML = `<span class="text-success">${result.message}</span>`;
-            appendHTML(
-              `📄 <strong>${file.name}</strong> has been analyzed. What would you like to know?`,
-              "ai-msg",
-            );
+          if (response.status === 202 && result.job_id) {
+            // Background processing started — poll for completion
+            status.innerHTML = `<span class="text-info"><span class="spinner-border spinner-border-sm me-1"></span> Analyzing document...</span>`;
+            pollUploadStatus(result.job_id, file.name, btn, status);
+          } else if (result.error) {
+            status.innerHTML = `<span class="text-danger">❌ ${result.error}</span>`;
+            btn.disabled = false;
           } else {
-            // FIX #14: Server returns safe error messages, displayed here
-            status.innerHTML = `<span class="text-danger">❌ ${result.error || "Upload failed."}</span>`;
+            status.innerHTML = `<span class="text-danger">❌ Upload failed. Please try again.</span>`;
+            btn.disabled = false;
           }
         } catch (err) {
           status.innerHTML = `<span class="text-danger">❌ Network error. Please try again.</span>`;
-        } finally {
           btn.disabled = false;
         }
+      }
+
+      function pollUploadStatus(jobId, fileName, btn, status) {
+        const interval = setInterval(async () => {
+          try {
+            const response = await fetch("/upload_status/" + jobId);
+            const data = await response.json();
+
+            if (data.status === "done") {
+              clearInterval(interval);
+              status.innerHTML = `<span class="text-success">${data.message}</span>`;
+              appendHTML(
+                `📄 <strong>${fileName}</strong> has been analyzed. What would you like to know?`,
+                "ai-msg",
+              );
+              btn.disabled = false;
+            } else if (data.status === "error") {
+              clearInterval(interval);
+              status.innerHTML = `<span class="text-danger">❌ ${data.message}</span>`;
+              btn.disabled = false;
+            }
+            // if "processing" — keep polling
+          } catch (err) {
+            clearInterval(interval);
+            status.innerHTML = `<span class="text-danger">❌ Status check failed. Please try again.</span>`;
+            btn.disabled = false;
+          }
+        }, 3000); // poll every 3 seconds
       }
 
       // ── Chat ─────────────────────────────────────────────────────────────────

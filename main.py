@@ -9,7 +9,9 @@ from app.service.llm_service import LLMService
 from app.models.vector_store import VectorStoreManager
 from app.service.storage_service import StorageService
 from langchain_community.document_loaders import PyPDFLoader
+import uuid
 
+_upload_jobs = {}
 # Configure server-side logging (errors logged here, not exposed to client)
 logging.basicConfig(
     level=logging.INFO,
