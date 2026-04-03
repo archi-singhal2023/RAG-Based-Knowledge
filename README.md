@@ -2,7 +2,7 @@
 
 An open-source, locally deployable AI system that lets you upload a PDF and chat with it using natural language.
 
-🚀 **Live Demo:** [DocuMind on HuggingFace Spaces](https://huggingface.co/spaces/your-username/documind)
+🚀 **Live Demo:** [DocuMind on HuggingFace Spaces](https://huggingface.co/spaces/Archi-01/Documind-space)
 
 ---
 
